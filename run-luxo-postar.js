@@ -5,11 +5,11 @@
 // Rosto sempre no topo, texto sempre na base (sem sobreposição)
 // ============================================================
 
-const { htmlImagem, htmlTexto, HANDLE, gerarImagem, baixarImagem, fetchImagemUrl } = require('./gerar-carrossel-ayumi');
-// bgHeight approach: container parcial → brand bg preenche o restante com gradiente suave
-// Math: bgHeight='820px' → overflow Y = 1350-820 = 530px
-//   bgPos Y=0%  → mostra px 0–820   (topo da foto — ideal para rosto alto)
-//   bgPos Y=10% → mostra px 53–873  (ligeiramente abaixo)
+const { htmlImagem, htmlTexto, HANDLE, gerarImagem, baixarImagem, fetchImagemUrl, cropImageComBgPos } = require('./gerar-carrossel-ayumi');
+// bgHeight + sharp crop: fotos reais são pré-cortadas no servidor
+// bgPosition Y% → offset do crop na foto original
+//   '50% 0%'  → mostra do topo (rosto no terço superior)
+//   '50% 20%' → começa 20% abaixo do topo
 const puppeteer = require('puppeteer');
 const fs   = require('fs');
 const path = require('path');
@@ -48,8 +48,8 @@ const SLIDES = [
     headline: 'Medo de postar no Instagram é luxo de quem já chegou.',
     corpo: '',
     _fotoKey: 'retrato1',
-    bgPosition: '50% 5%',
-    bgHeight: '820px',
+    bgPosition: '50% 0%',
+    bgHeight: '900px',
   },
   {
     numero: 2,
@@ -116,8 +116,8 @@ const SLIDES = [
     headline: 'Se você quer se posicionar e ter liberdade financeira sem tráfego pago, entre no Grupo VIP.',
     corpo: 'Link na bio.\nOu me manda uma DM: "QUERO".',
     _fotoKey: 'trabalho',
-    bgPosition: '50% 5%',
-    bgHeight: '820px',
+    bgPosition: '50% 0%',
+    bgHeight: '880px',
   },
 ];
 
@@ -151,6 +151,14 @@ async function main() {
   for (const s of SLIDES) {
     if (s._fotoKey || s.imagemPrompt) {
       imgs[s.numero] = await resolverImagem(s, outputDir);
+    }
+  }
+
+  // Pré-corte sharp para fotos reais com bgHeight definido
+  for (const s of SLIDES) {
+    if (s.bgHeight && imgs[s.numero]) {
+      imgs[s.numero] = await cropImageComBgPos(imgs[s.numero], s.bgHeight, s.bgPosition||'50% 0%');
+      console.log(`[${s.numero}] Foto cortada para topo ${s.bgHeight}`);
     }
   }
 

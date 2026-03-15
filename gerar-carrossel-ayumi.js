@@ -9,6 +9,7 @@ const http  = require('http');
 const fs    = require('fs');
 const path  = require('path');
 const puppeteer = require('puppeteer');
+const sharp = require('sharp');
 
 const FAL_API_KEY = '4d8ed20f-cbe5-48a7-9ae2-c708c8b6189e:f6aa36d11d1f4457da34b6655d3df5d8';
 const HANDLE = '@thais_ayumi';
@@ -46,6 +47,29 @@ async function fetchImagemUrl(url) {
       });
     }).on('error', reject);
   });
+}
+
+// ── PRÉ-CORTE COM SHARP ──────────────────────────────────────
+// Para fotos reais (1080×1350 = mesmo tamanho do container):
+//   bgPosition não tem efeito com background-size:cover (sem overflow)
+//   Solução: sharp recorta só os pixels necessários antes do HTML
+//   bgPosition Y% → ponto de início do corte na foto original
+//   Resultado: imagem recortada = exatamente bgHeight px → ajuste perfeito
+async function cropImageComBgPos(base64str, bgHeightStr, bgPositionStr) {
+  const heightPx = parseInt(bgHeightStr);
+  const base64   = base64str.replace(/^data:image\/\w+;base64,/, '');
+  const buf      = Buffer.from(base64, 'base64');
+  const { width, height } = await sharp(buf).metadata();
+  const overflowY = Math.max(0, height - heightPx);
+  const parts  = (bgPositionStr || '50% 0%').split(' ');
+  const yPct   = parseFloat(parts[1] || '0') / 100;
+  const cropTop = Math.round(yPct * overflowY);
+  const cropH   = Math.min(heightPx, height - cropTop);
+  const cropped = await sharp(buf)
+    .extract({ left: 0, top: cropTop, width, height: cropH })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+  return 'data:image/jpeg;base64,' + cropped.toString('base64');
 }
 
 const COMPOSICAO_PADRAO = ' — CINEMATIC COMPOSITION (mandatory): (1) Subject/face in UPPER 55% of frame, eyes near upper rule-of-thirds line at ~33% from top. (2) Lower 45% = deep shadow, naturally underexposed, empty negative space — NO detail in this zone, it receives text overlay. (3) Single directional light source: Rembrandt or side-lit, hard shadows, high contrast. (4) Shallow depth of field, background soft bokeh f/1.4. (5) Deep blacks, rich shadows, film grain visible. (6) Portrait 4:5, 1080x1350px. NO faces showing clearly — mood and atmosphere only.';
@@ -147,61 +171,73 @@ ${nota?`<div class="nota">${nota}</div>`:''}
 }
 
 // ── TEMPLATE IMAGEM — foto elegante, overlay vinho ───────────
-// bgPosition: controla enquadramento da foto dentro do container parcial
-//   'top center'    → FLUX (sujeito já está no topo por COMPOSICAO_PADRAO)
-//   '50% 5%'        → foto real — mostra topo da foto (rosto)
-// bgHeight: altura do container de imagem (partial-height approach)
-//   null/''         → imagem full-bleed (FLUX — já composicionado)
-//   '820px'         → container parcial — os 530px restantes = brand bg + gradiente suave
-// Regra de ouro: olhos/rosto no terço superior do slide (0–33% do topo = 0–445px)
-// Math: container=820px, img=1080×1350, cover → overflow Y=530px
-//   bgPos Y=0% → mostra px 0-820 da foto | Y=50% → px 265-1085 | Y=100% → px 530-1350
+// FLUX (sem bgHeight): imagem full-bleed — já composicionada pelo COMPOSICAO_PADRAO
+// Foto real (bgHeight set): imagem pré-cortada pelo sharp antes do HTML
+//   → img64 já é o recorte exato de bgHeight pixels
+//   → container = exatamente bgHeight px → sem overflow, sem distorção, sem bgPosition needed
+//   → gradiente longo (500px) funde suavemente com o brand bg abaixo
+// Regra de ouro: olhos no terço superior do slide (0–33% = 0–445px)
 function htmlImagem(n, total, img64, tag, headline, corpo, bgPosition, bgHeight) {
   const fs_ = headline.length > 50 ? '80px' : headline.length > 36 ? '92px' : '106px';
-  const bgPos = bgPosition || 'top center';
-  const imgH  = bgHeight   || '100%';
-  const hasBgH = !!bgHeight;
-  // Fade começa 160px antes do fim do container de imagem
-  const fadeTop = hasBgH ? `calc(${imgH} - 160px)` : '55%';
+  const imgH = bgHeight || '100%';
+  // Fade: começa a 58% do container de imagem, dura 500px — invisível ao olho
+  const fadeTop  = bgHeight ? `calc(${imgH} * 0.58)` : '52%';
+  const fadeH    = '500px';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:1080px;height:1350px;overflow:hidden}
-/* brand dark vinho — fica visível na zona abaixo da imagem parcial */
+/* brand vinho profundo — zone below cropped image */
 .slide{position:relative;width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:flex-end;
-  background:linear-gradient(150deg,#0d0408 0%,#1e0810 30%,#2a0f18 58%,#130610 100%)}
+  background:linear-gradient(160deg,#0d0408 0%,#1a0710 35%,#250d16 62%,#0f0509 100%)}
 
-/* container de imagem — height parcial quando bgHeight definido */
+/* imagem — height parcial (foto real pré-cortada) ou full-bleed (FLUX) */
 .bg{position:absolute;top:0;left:0;right:0;height:${imgH};
   background-image:url('${img64}');
-  background-size:cover;background-position:${bgPos};
-  filter:brightness(.78) saturate(.88)}
+  background-size:cover;background-position:center top;
+  filter:brightness(.76) saturate(.84) contrast(1.06)}
 
-/* fade cinematográfico: conecta imagem ao fundo brand com gradiente suave */
-.bg-fade{position:absolute;left:0;right:0;top:${fadeTop};height:280px;z-index:2;
+/* fade longo (500px) — transição imperceptível de foto → brand bg (Gordon Willis) */
+.bg-fade{position:absolute;left:0;right:0;top:${fadeTop};height:${fadeH};z-index:2;pointer-events:none;
   background:linear-gradient(to bottom,
-    transparent 0%,
-    rgba(19,6,16,.55) 30%,
-    rgba(13,4,8,.88) 65%,
-    rgba(10,3,6,1.0) 100%
+    transparent            0%,
+    rgba(13,4,10,.10)     15%,
+    rgba(13,4,10,.32)     32%,
+    rgba(13,4,10,.62)     52%,
+    rgba(13,4,10,.85)     72%,
+    rgba(13,4,10,.97)     88%,
+    rgba(10,3,8,1.00)    100%
   )}
 
-/* overlay clássico: base densa para texto legível */
+/* overlay principal: base opaca para texto, rosto respira no topo */
 .ov{position:absolute;inset:0;
-  background:linear-gradient(
-    to top,
-    rgba(20,5,12,1.0)  0%,
-    rgba(20,5,12,0.97) 18%,
-    rgba(20,5,12,0.85) 35%,
-    rgba(20,5,12,0.08) 52%,
-    rgba(20,5,12,0.02) 68%,
+  background:linear-gradient(to top,
+    rgba(20,5,12,1.00)  0%,
+    rgba(20,5,12,0.98) 14%,
+    rgba(20,5,12,0.90) 28%,
+    rgba(20,5,12,0.62) 42%,
+    rgba(20,5,12,0.22) 58%,
+    rgba(20,5,12,0.05) 72%,
     transparent        100%
   )}
 
-/* vinheta cinematográfica — escurece bordas, isola o sujeito */
+/* proteção extra da zona de texto (55% inferior) — Conrad Hall safety flag */
+.ov-texto{position:absolute;bottom:0;left:0;right:0;height:55%;pointer-events:none;
+  background:linear-gradient(to top,
+    rgba(20,5,12,1.00)  0%,
+    rgba(20,5,12,0.94) 30%,
+    rgba(20,5,12,0.55) 65%,
+    transparent        100%
+  )}
+
+/* proteção do topo — logo e handle sempre legíveis */
+.topo-grad{position:absolute;top:0;left:0;right:0;height:20%;pointer-events:none;
+  background:linear-gradient(to bottom,rgba(20,5,12,.7) 0%,rgba(20,5,12,.3) 50%,transparent 100%)}
+
+/* vinheta — bordas escurecidas, foco no sujeito (Willis / Deakins) */
 .vinheta{position:absolute;inset:0;z-index:4;pointer-events:none;
-  background:radial-gradient(ellipse 88% 78% at 50% 35%, transparent 25%, rgba(8,1,6,.58) 100%)}
+  background:radial-gradient(ellipse 92% 70% at 50% 28%, transparent 18%, rgba(8,1,6,.38) 62%, rgba(8,1,6,.72) 100%)}
 
 /* logo topo direito */
 .logo{position:absolute;top:52px;right:72px;width:80px;opacity:.8;z-index:10}
@@ -213,7 +249,7 @@ body{width:1080px;height:1350px;overflow:hidden}
   text-transform:uppercase;color:#C9A84C;opacity:.8;margin-bottom:20px;display:${tag?'block':'none'}}
 .headline{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:${fs_};line-height:1.05;
   color:#F5EDE3;letter-spacing:-.01em;margin-bottom:${corpo?'28px':'0'};max-width:840px;
-  text-shadow:0 2px 30px rgba(0,0,0,.6)}
+  text-shadow:0 2px 30px rgba(0,0,0,.7),0 1px 8px rgba(0,0,0,.9)}
 .divisor{width:36px;height:1px;background:rgba(212,175,110,.6);margin-bottom:24px;display:${corpo?'block':'none'}}
 .corpo{font-family:'Inter',sans-serif;font-weight:300;font-size:40px;line-height:1.6;
   color:rgba(240,220,200,.92);max-width:860px;
@@ -226,6 +262,7 @@ body{width:1080px;height:1350px;overflow:hidden}
   width:${(n/total)*100}%;background:linear-gradient(to right,transparent,rgba(212,175,110,.6))}
 </style></head><body><div class="slide">
 <div class="bg"></div><div class="bg-fade"></div><div class="ov"></div>
+<div class="ov-texto"></div><div class="topo-grad"></div>
 <div class="vinheta"></div>
 <div class="logo">${LOGO_SVG}</div>
 <div class="content">
@@ -271,6 +308,15 @@ async function gerarCarrosselAyumi(slides, pastaSlug, legenda) {
     }
   }
 
+  // Pré-corte sharp para fotos reais com bgHeight definido
+  // bgPosition Y% → offset do crop (ex: '50% 15%' → 15% do overflow vertical)
+  for (const s of slides) {
+    if (s.bgHeight && imgs[s.numero]) {
+      imgs[s.numero] = await cropImageComBgPos(imgs[s.numero], s.bgHeight, s.bgPosition||'50% 0%');
+      console.log(`[${s.numero}] Foto cortada para topo ${s.bgHeight}`);
+    }
+  }
+
   const htmls = {};
   for (const s of slides) {
     htmls[s.numero] = s.layout === 'texto'
@@ -297,4 +343,4 @@ async function gerarCarrosselAyumi(slides, pastaSlug, legenda) {
   return pngDir;
 }
 
-module.exports = { gerarCarrosselAyumi, htmlTexto, htmlImagem, HANDLE, gerarImagem, baixarImagem, fetchImagemUrl };
+module.exports = { gerarCarrosselAyumi, htmlTexto, htmlImagem, HANDLE, gerarImagem, baixarImagem, fetchImagemUrl, cropImageComBgPos };
