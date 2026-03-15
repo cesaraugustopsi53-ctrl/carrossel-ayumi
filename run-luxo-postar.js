@@ -48,7 +48,7 @@ const SLIDES = [
     headline: 'Medo de postar no Instagram é luxo de quem já chegou.',
     corpo: '',
     _fotoKey: 'retrato1',
-    bgPosition: '50% 0%',
+    bgPosition: '50% 36%',
     bgHeight: '900px',
   },
   {
@@ -116,7 +116,7 @@ const SLIDES = [
     headline: 'Se você quer se posicionar e ter liberdade financeira sem tráfego pago, entre no Grupo VIP.',
     corpo: 'Link na bio.\nOu me manda uma DM: "QUERO".',
     _fotoKey: 'trabalho',
-    bgPosition: '50% 0%',
+    bgPosition: '50% 12%',
     bgHeight: '880px',
   },
 ];

@@ -121,9 +121,9 @@ body{width:1080px;height:1350px;overflow:hidden}
 .slide::before{content:'';position:absolute;right:0;top:10%;bottom:10%;width:1px;
   background:linear-gradient(to bottom,transparent,rgba(212,175,110,0.55),transparent)}
 
-/* vinheta cinematográfica — escurece bordas como lente anamórfica */
+/* vinheta — só lados + base, topo limpo */
 .vinheta{position:absolute;inset:0;z-index:4;pointer-events:none;
-  background:radial-gradient(ellipse 88% 82% at 50% 42%, transparent 28%, rgba(8,1,6,.62) 100%)}
+  background:radial-gradient(ellipse 90% 92% at 50% -5%, transparent 40%, rgba(8,1,6,.38) 72%, rgba(8,1,6,.60) 100%)}
 
 /* logo no topo direito */
 .logo{position:absolute;top:60px;right:80px;width:80px;opacity:0.85;z-index:10}
@@ -180,15 +180,15 @@ ${nota?`<div class="nota">${nota}</div>`:''}
 function htmlImagem(n, total, img64, tag, headline, corpo, bgPosition, bgHeight) {
   const fs_ = headline.length > 50 ? '80px' : headline.length > 36 ? '92px' : '106px';
   const imgH = bgHeight || '100%';
-  // Fade: começa a 58% do container de imagem, dura 500px — invisível ao olho
-  const fadeTop  = bgHeight ? `calc(${imgH} * 0.58)` : '52%';
-  const fadeH    = '500px';
+  // Fade começa a 50% do container — 600px de transição suave
+  const fadeTop  = bgHeight ? `calc(${imgH} * 0.50)` : '54%';
+  const fadeH    = bgHeight ? '600px' : '480px';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:1080px;height:1350px;overflow:hidden}
-/* brand vinho profundo — zone below cropped image */
+/* brand vinho profundo — zona abaixo da imagem cortada */
 .slide{position:relative;width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:flex-end;
   background:linear-gradient(160deg,#0d0408 0%,#1a0710 35%,#250d16 62%,#0f0509 100%)}
 
@@ -196,48 +196,34 @@ body{width:1080px;height:1350px;overflow:hidden}
 .bg{position:absolute;top:0;left:0;right:0;height:${imgH};
   background-image:url('${img64}');
   background-size:cover;background-position:center top;
-  filter:brightness(.76) saturate(.84) contrast(1.06)}
+  filter:brightness(.82) saturate(.86) contrast(1.04)}
 
-/* fade longo (500px) — transição imperceptível de foto → brand bg (Gordon Willis) */
+/* fade long (600px) — funde foto com brand bg, imperceptível (Gordon Willis) */
 .bg-fade{position:absolute;left:0;right:0;top:${fadeTop};height:${fadeH};z-index:2;pointer-events:none;
   background:linear-gradient(to bottom,
-    transparent            0%,
-    rgba(13,4,10,.10)     15%,
-    rgba(13,4,10,.32)     32%,
-    rgba(13,4,10,.62)     52%,
-    rgba(13,4,10,.85)     72%,
-    rgba(13,4,10,.97)     88%,
-    rgba(10,3,8,1.00)    100%
+    transparent         0%,
+    rgba(13,4,10,.06)  18%,
+    rgba(13,4,10,.20)  36%,
+    rgba(13,4,10,.52)  56%,
+    rgba(13,4,10,.82)  76%,
+    rgba(13,4,10,.97)  92%,
+    rgba(10,3,8,1.00) 100%
   )}
 
-/* overlay principal: base opaca para texto, rosto respira no topo */
+/* overlay: APENAS a base — rosto completamente livre no topo */
 .ov{position:absolute;inset:0;
   background:linear-gradient(to top,
     rgba(20,5,12,1.00)  0%,
-    rgba(20,5,12,0.98) 14%,
-    rgba(20,5,12,0.90) 28%,
-    rgba(20,5,12,0.62) 42%,
-    rgba(20,5,12,0.22) 58%,
-    rgba(20,5,12,0.05) 72%,
-    transparent        100%
+    rgba(20,5,12,0.97) 18%,
+    rgba(20,5,12,0.82) 32%,
+    rgba(20,5,12,0.20) 42%,
+    rgba(20,5,12,0.02) 50%,
+    transparent        58%
   )}
 
-/* proteção extra da zona de texto (55% inferior) — Conrad Hall safety flag */
-.ov-texto{position:absolute;bottom:0;left:0;right:0;height:55%;pointer-events:none;
-  background:linear-gradient(to top,
-    rgba(20,5,12,1.00)  0%,
-    rgba(20,5,12,0.94) 30%,
-    rgba(20,5,12,0.55) 65%,
-    transparent        100%
-  )}
-
-/* proteção do topo — logo e handle sempre legíveis */
-.topo-grad{position:absolute;top:0;left:0;right:0;height:20%;pointer-events:none;
-  background:linear-gradient(to bottom,rgba(20,5,12,.7) 0%,rgba(20,5,12,.3) 50%,transparent 100%)}
-
-/* vinheta — bordas escurecidas, foco no sujeito (Willis / Deakins) */
+/* vinheta — ZERO no topo, só lados + base (Deakins: frames sides, não queima o rosto) */
 .vinheta{position:absolute;inset:0;z-index:4;pointer-events:none;
-  background:radial-gradient(ellipse 92% 70% at 50% 28%, transparent 18%, rgba(8,1,6,.38) 62%, rgba(8,1,6,.72) 100%)}
+  background:radial-gradient(ellipse 90% 92% at 50% -5%, transparent 40%, rgba(8,1,6,.38) 72%, rgba(8,1,6,.60) 100%)}
 
 /* logo topo direito */
 .logo{position:absolute;top:52px;right:72px;width:80px;opacity:.8;z-index:10}
@@ -262,7 +248,6 @@ body{width:1080px;height:1350px;overflow:hidden}
   width:${(n/total)*100}%;background:linear-gradient(to right,transparent,rgba(212,175,110,.6))}
 </style></head><body><div class="slide">
 <div class="bg"></div><div class="bg-fade"></div><div class="ov"></div>
-<div class="ov-texto"></div><div class="topo-grad"></div>
 <div class="vinheta"></div>
 <div class="logo">${LOGO_SVG}</div>
 <div class="content">
