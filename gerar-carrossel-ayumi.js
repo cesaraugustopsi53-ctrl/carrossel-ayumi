@@ -31,8 +31,12 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 400" 
 async function fetchImagemUrl(url) {
   return new Promise((resolve, reject) => {
     (url.startsWith('https') ? https : http).get(url, (res) => {
-      if (res.statusCode === 302 || res.statusCode === 301) {
+      if (res.statusCode === 301 || res.statusCode === 302) {
         return fetchImagemUrl(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode} para ${url}`));
       }
       const chunks = [];
       res.on('data', c => chunks.push(c));
@@ -44,9 +48,12 @@ async function fetchImagemUrl(url) {
   });
 }
 
+const COMPOSICAO_PADRAO = ' — CINEMATIC COMPOSITION (mandatory): (1) Subject/face in UPPER 55% of frame, eyes near upper rule-of-thirds line at ~33% from top. (2) Lower 45% = deep shadow, naturally underexposed, empty negative space — NO detail in this zone, it receives text overlay. (3) Single directional light source: Rembrandt or side-lit, hard shadows, high contrast. (4) Shallow depth of field, background soft bokeh f/1.4. (5) Deep blacks, rich shadows, film grain visible. (6) Portrait 4:5, 1080x1350px. NO faces showing clearly — mood and atmosphere only.';
+
 async function gerarImagem(prompt) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ prompt, image_size: { width: 1080, height: 1350 }, num_inference_steps: 28, guidance_scale: 3.5, num_images: 1, safety_tolerance: '5' });
+    const promptFinal = prompt + COMPOSICAO_PADRAO;
+    const body = JSON.stringify({ prompt: promptFinal, image_size: { width: 1080, height: 1350 }, num_inference_steps: 28, guidance_scale: 3.5, num_images: 1, safety_tolerance: '5' });
     const req = https.request({ hostname: 'fal.run', path: '/fal-ai/flux-pro', method: 'POST',
       headers: { 'Authorization': `Key ${FAL_API_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
     }, (res) => {
@@ -76,45 +83,54 @@ function htmlTexto(n, total, tag, headline, corpo, nota) {
 body{width:1080px;height:1350px;overflow:hidden}
 .slide{width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
   padding:110px 110px 200px 110px;position:relative;
-  background:linear-gradient(150deg,#1a0810 0%,#2a0f18 45%,#1e0b13 100%)}
+  /* Storaro: fonte de luz quente saindo do canto inferior esquerdo (vela/candelabro) */
+  background:linear-gradient(150deg,#0d0408 0%,#1e0810 30%,#2a0f18 58%,#130610 100%)}
 
-/* textura sutil */
+/* luz quente baixo-esquerda (candle light) + escuridão fria alto-direita */
 .slide::after{content:'';position:absolute;inset:0;
-  background:radial-gradient(ellipse at 80% 20%, rgba(212,175,110,0.06) 0%, transparent 60%);
+  background:
+    radial-gradient(ellipse 60% 50% at 8% 90%, rgba(200,120,40,.16) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 92% 10%, rgba(10,2,8,.75) 0%, transparent 65%);
   pointer-events:none}
 
-/* linha lateral dourada fina */
-.slide::before{content:'';position:absolute;right:0;top:12%;bottom:12%;width:1px;
-  background:linear-gradient(to bottom,transparent,rgba(212,175,110,0.5),transparent)}
+/* linha lateral dourada — borda direita, respiro visual */
+.slide::before{content:'';position:absolute;right:0;top:10%;bottom:10%;width:1px;
+  background:linear-gradient(to bottom,transparent,rgba(212,175,110,0.55),transparent)}
+
+/* vinheta cinematográfica — escurece bordas como lente anamórfica */
+.vinheta{position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(ellipse 88% 82% at 50% 42%, transparent 28%, rgba(8,1,6,.62) 100%)}
 
 /* logo no topo direito */
-.logo{position:absolute;top:60px;right:80px;width:80px;opacity:0.85}
+.logo{position:absolute;top:60px;right:80px;width:80px;opacity:0.85;z-index:10}
 
-.num{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;letter-spacing:.22em;
+.num{position:relative;z-index:10;font-family:'Inter',sans-serif;font-weight:400;font-size:12px;letter-spacing:.22em;
   color:rgba(212,175,110,0.55);margin-bottom:${tag?'18px':'48px'};text-transform:uppercase}
-.tag{font-family:'Inter',sans-serif;font-weight:400;font-size:11px;letter-spacing:.22em;
+.tag{position:relative;z-index:10;font-family:'Inter',sans-serif;font-weight:400;font-size:11px;letter-spacing:.22em;
   text-transform:uppercase;color:#C9A84C;opacity:.8;margin-bottom:28px;display:${tag?'block':'none'}}
 
 /* headline em Cormorant — elegante, serifada */
-.headline{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:${fs_};line-height:1.05;
-  color:#F5EDE3;letter-spacing:-.01em;margin-bottom:${corpo?'48px':'0'};max-width:840px}
+.headline{position:relative;z-index:10;font-family:'Cormorant Garamond',serif;font-weight:600;font-size:${fs_};line-height:1.05;
+  color:#F5EDE3;letter-spacing:-.01em;margin-bottom:${corpo?'48px':'0'};max-width:840px;
+  text-shadow:0 2px 40px rgba(0,0,0,.5)}
 
-.divisor{width:36px;height:1px;background:rgba(212,175,110,0.6);margin-bottom:36px;display:${corpo?'block':'none'}}
+.divisor{position:relative;z-index:10;width:36px;height:1px;background:rgba(212,175,110,0.6);margin-bottom:36px;display:${corpo?'block':'none'}}
 
-.corpo{font-family:'Inter',sans-serif;font-weight:300;font-size:42px;line-height:1.6;
+.corpo{position:relative;z-index:10;font-family:'Inter',sans-serif;font-weight:300;font-size:42px;line-height:1.6;
   color:rgba(240,232,220,0.96);max-width:860px;white-space:pre-line;display:${corpo?'block':'none'}}
 
-.nota{position:absolute;bottom:88px;left:110px;right:180px;
+.nota{position:absolute;bottom:88px;left:110px;right:180px;z-index:10;
   font-family:'Cormorant Garamond',serif;font-weight:400;font-style:italic;font-size:18px;
   color:rgba(212,175,110,0.65);display:${nota?'block':'none'}}
 
-.handle{position:absolute;bottom:80px;right:80px;
+.handle{position:absolute;bottom:80px;right:80px;z-index:10;
   font-family:'Inter',sans-serif;font-weight:400;font-size:17px;letter-spacing:.08em;
   color:rgba(212,175,110,0.5)}
 
-.bar{position:absolute;bottom:0;left:0;height:1px;width:${(n/total)*100}%;
+.bar{position:absolute;bottom:0;left:0;z-index:10;height:1px;width:${(n/total)*100}%;
   background:linear-gradient(to right,transparent,rgba(212,175,110,0.6))}
 </style></head><body><div class="slide">
+<div class="vinheta"></div>
 <div class="logo">${LOGO_SVG}</div>
 <div class="num">${String(n).padStart(2,'0')} / ${String(total).padStart(2,'0')}</div>
 ${tag?`<div class="tag">${tag}</div>`:''}
@@ -123,39 +139,74 @@ ${corpo?`<div class="divisor"></div><div class="corpo">${corpo}</div>`:''}
 ${nota?`<div class="nota">${nota}</div>`:''}
 <div class="handle">${HANDLE}</div>
 <div class="bar"></div>
-</div></body></html>`;
+<!-- grain cinematográfico via canvas (Khondji / Deakins style) -->
+<canvas id="g" style="position:absolute;inset:0;opacity:.032;pointer-events:none;z-index:9;mix-blend-mode:soft-light"></canvas>
+</div>
+<script>(function(){const c=document.getElementById('g');c.width=1080;c.height=1350;const x=c.getContext('2d'),d=x.createImageData(1080,1350);for(let i=0;i<d.data.length;i+=4){const v=~~(Math.random()*255);d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255;}x.putImageData(d,0,0);})();</script>
+</body></html>`;
 }
 
 // ── TEMPLATE IMAGEM — foto elegante, overlay vinho ───────────
-function htmlImagem(n, total, img64, tag, headline, corpo) {
+// bgPosition: controla enquadramento da foto dentro do container parcial
+//   'top center'    → FLUX (sujeito já está no topo por COMPOSICAO_PADRAO)
+//   '50% 5%'        → foto real — mostra topo da foto (rosto)
+// bgHeight: altura do container de imagem (partial-height approach)
+//   null/''         → imagem full-bleed (FLUX — já composicionado)
+//   '820px'         → container parcial — os 530px restantes = brand bg + gradiente suave
+// Regra de ouro: olhos/rosto no terço superior do slide (0–33% do topo = 0–445px)
+// Math: container=820px, img=1080×1350, cover → overflow Y=530px
+//   bgPos Y=0% → mostra px 0-820 da foto | Y=50% → px 265-1085 | Y=100% → px 530-1350
+function htmlImagem(n, total, img64, tag, headline, corpo, bgPosition, bgHeight) {
   const fs_ = headline.length > 50 ? '80px' : headline.length > 36 ? '92px' : '106px';
+  const bgPos = bgPosition || 'top center';
+  const imgH  = bgHeight   || '100%';
+  const hasBgH = !!bgHeight;
+  // Fade começa 160px antes do fim do container de imagem
+  const fadeTop = hasBgH ? `calc(${imgH} - 160px)` : '55%';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:1080px;height:1350px;overflow:hidden}
-.slide{position:relative;width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:flex-end}
+/* brand dark vinho — fica visível na zona abaixo da imagem parcial */
+.slide{position:relative;width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:flex-end;
+  background:linear-gradient(150deg,#0d0408 0%,#1e0810 30%,#2a0f18 58%,#130610 100%)}
 
-.bg{position:absolute;inset:0;
+/* container de imagem — height parcial quando bgHeight definido */
+.bg{position:absolute;top:0;left:0;right:0;height:${imgH};
   background-image:url('${img64}');
-  background-size:cover;background-position:center;
-  filter:brightness(.68) saturate(.80)}
+  background-size:cover;background-position:${bgPos};
+  filter:brightness(.78) saturate(.88)}
 
-/* overlay vinho só embaixo */
+/* fade cinematográfico: conecta imagem ao fundo brand com gradiente suave */
+.bg-fade{position:absolute;left:0;right:0;top:${fadeTop};height:280px;z-index:2;
+  background:linear-gradient(to bottom,
+    transparent 0%,
+    rgba(19,6,16,.55) 30%,
+    rgba(13,4,8,.88) 65%,
+    rgba(10,3,6,1.0) 100%
+  )}
+
+/* overlay clássico: base densa para texto legível */
 .ov{position:absolute;inset:0;
   background:linear-gradient(
     to top,
-    rgba(20,5,12,0.97) 0%,
-    rgba(20,5,12,0.88) 28%,
-    rgba(20,5,12,0.45) 50%,
-    rgba(20,5,12,0.08) 70%,
-    transparent 100%
+    rgba(20,5,12,1.0)  0%,
+    rgba(20,5,12,0.97) 18%,
+    rgba(20,5,12,0.85) 35%,
+    rgba(20,5,12,0.08) 52%,
+    rgba(20,5,12,0.02) 68%,
+    transparent        100%
   )}
+
+/* vinheta cinematográfica — escurece bordas, isola o sujeito */
+.vinheta{position:absolute;inset:0;z-index:4;pointer-events:none;
+  background:radial-gradient(ellipse 88% 78% at 50% 35%, transparent 25%, rgba(8,1,6,.58) 100%)}
 
 /* logo topo direito */
 .logo{position:absolute;top:52px;right:72px;width:80px;opacity:.8;z-index:10}
 
-.content{position:relative;z-index:10;padding:0 110px 96px;width:100%}
+.content{position:relative;z-index:10;padding:0 110px 148px;width:100%}
 .num{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;letter-spacing:.22em;
   color:rgba(212,175,110,.6);margin-bottom:${tag?'16px':'32px'};text-transform:uppercase}
 .tag{font-family:'Inter',sans-serif;font-weight:400;font-size:11px;letter-spacing:.22em;
@@ -174,7 +225,8 @@ body{width:1080px;height:1350px;overflow:hidden}
 .bar{position:absolute;bottom:0;left:0;z-index:10;height:1px;
   width:${(n/total)*100}%;background:linear-gradient(to right,transparent,rgba(212,175,110,.6))}
 </style></head><body><div class="slide">
-<div class="bg"></div><div class="ov"></div>
+<div class="bg"></div><div class="bg-fade"></div><div class="ov"></div>
+<div class="vinheta"></div>
 <div class="logo">${LOGO_SVG}</div>
 <div class="content">
 <div class="num">${String(n).padStart(2,'0')} / ${String(total).padStart(2,'0')}</div>
@@ -184,7 +236,11 @@ ${corpo?`<div class="divisor"></div><div class="corpo">${corpo}</div>`:''}
 </div>
 <div class="handle">${HANDLE}</div>
 <div class="bar"></div>
-</div></body></html>`;
+<!-- grain cinematográfico -->
+<canvas id="g" style="position:absolute;inset:0;opacity:.028;pointer-events:none;z-index:11;mix-blend-mode:soft-light"></canvas>
+</div>
+<script>(function(){const c=document.getElementById('g');c.width=1080;c.height=1350;const x=c.getContext('2d'),d=x.createImageData(1080,1350);for(let i=0;i<d.data.length;i+=4){const v=~~(Math.random()*255);d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255;}x.putImageData(d,0,0);})();</script>
+</body></html>`;
 }
 
 async function htmlParaPng(html, pngPath, browser) {
@@ -219,7 +275,7 @@ async function gerarCarrosselAyumi(slides, pastaSlug, legenda) {
   for (const s of slides) {
     htmls[s.numero] = s.layout === 'texto'
       ? htmlTexto(s.numero, total, s.tag||'', s.headline, s.corpo||'', s.nota||'')
-      : htmlImagem(s.numero, total, imgs[s.numero]||'', s.tag||'', s.headline, s.corpo||'');
+      : htmlImagem(s.numero, total, imgs[s.numero]||'', s.tag||'', s.headline, s.corpo||'', s.bgPosition||'', s.bgHeight||'');
     fs.writeFileSync(path.join(outputDir, `slide-${s.numero}.html`), htmls[s.numero]);
   }
 
