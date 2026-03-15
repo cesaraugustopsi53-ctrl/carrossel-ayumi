@@ -1,0 +1,4 @@
+node_modules/
+output/
+*.tmp
+2026-*.txt

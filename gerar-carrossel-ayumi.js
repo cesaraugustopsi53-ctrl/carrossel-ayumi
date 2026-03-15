@@ -1,0 +1,244 @@
+// ============================================================
+// GERADOR CARROSSEL — @thais_ayumi — Mentoria Ayumi
+// Visual: vinho profundo + dourado + branco creme
+// Estética: luxo, feminino, editorial, espaçado
+// ============================================================
+
+const https = require('https');
+const http  = require('http');
+const fs    = require('fs');
+const path  = require('path');
+const puppeteer = require('puppeteer');
+
+const FAL_API_KEY = '4d8ed20f-cbe5-48a7-9ae2-c708c8b6189e:f6aa36d11d1f4457da34b6655d3df5d8';
+const HANDLE = '@thais_ayumi';
+
+// SVG logo inline (base64 para usar no HTML)
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 400" width="120" height="150">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4AF6E"/>
+      <stop offset="40%" style="stop-color:#F0D080"/>
+      <stop offset="70%" style="stop-color:#C9A84C"/>
+      <stop offset="100%" style="stop-color:#A8843C"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="160" cy="170" rx="110" ry="130" fill="none" stroke="url(#g)" stroke-width="1.5"/>
+  <text x="160" y="200" font-family="Georgia,serif" font-size="96" font-weight="600" fill="url(#g)" text-anchor="middle" letter-spacing="-4">AM</text>
+  <text x="160" y="340" font-family="Georgia,serif" font-size="26" font-weight="400" fill="url(#g)" text-anchor="middle" letter-spacing="3">Mentoria Ayumi</text>
+</svg>`;
+
+async function fetchImagemUrl(url) {
+  return new Promise((resolve, reject) => {
+    (url.startsWith('https') ? https : http).get(url, (res) => {
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        return fetchImagemUrl(res.headers.location).then(resolve).catch(reject);
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        resolve('data:image/jpeg;base64,' + buf.toString('base64'));
+      });
+    }).on('error', reject);
+  });
+}
+
+async function gerarImagem(prompt) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ prompt, image_size: { width: 1080, height: 1350 }, num_inference_steps: 28, guidance_scale: 3.5, num_images: 1, safety_tolerance: '5' });
+    const req = https.request({ hostname: 'fal.run', path: '/fal-ai/flux-pro', method: 'POST',
+      headers: { 'Authorization': `Key ${FAL_API_KEY}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      let data = ''; res.on('data', c => data += c);
+      res.on('end', () => { try { resolve(JSON.parse(data).images[0].url); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject); req.write(body); req.end();
+  });
+}
+
+async function baixarImagem(url, destino) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destino);
+    (url.startsWith('https') ? https : http).get(url, (res) => {
+      res.pipe(file); file.on('finish', () => { file.close(); resolve(destino); });
+    }).on('error', reject);
+  });
+}
+
+// ── TEMPLATE TEXTO PURO — vinho profundo + dourado ───────────
+function htmlTexto(n, total, tag, headline, corpo, nota) {
+  const fs_ = headline.length > 50 ? '84px' : headline.length > 36 ? '96px' : '110px';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1080px;height:1350px;overflow:hidden}
+.slide{width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+  padding:110px 110px 200px 110px;position:relative;
+  background:linear-gradient(150deg,#1a0810 0%,#2a0f18 45%,#1e0b13 100%)}
+
+/* textura sutil */
+.slide::after{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 80% 20%, rgba(212,175,110,0.06) 0%, transparent 60%);
+  pointer-events:none}
+
+/* linha lateral dourada fina */
+.slide::before{content:'';position:absolute;right:0;top:12%;bottom:12%;width:1px;
+  background:linear-gradient(to bottom,transparent,rgba(212,175,110,0.5),transparent)}
+
+/* logo no topo direito */
+.logo{position:absolute;top:60px;right:80px;width:80px;opacity:0.85}
+
+.num{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;letter-spacing:.22em;
+  color:rgba(212,175,110,0.55);margin-bottom:${tag?'18px':'48px'};text-transform:uppercase}
+.tag{font-family:'Inter',sans-serif;font-weight:400;font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:#C9A84C;opacity:.8;margin-bottom:28px;display:${tag?'block':'none'}}
+
+/* headline em Cormorant — elegante, serifada */
+.headline{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:${fs_};line-height:1.05;
+  color:#F5EDE3;letter-spacing:-.01em;margin-bottom:${corpo?'48px':'0'};max-width:840px}
+
+.divisor{width:36px;height:1px;background:rgba(212,175,110,0.6);margin-bottom:36px;display:${corpo?'block':'none'}}
+
+.corpo{font-family:'Inter',sans-serif;font-weight:300;font-size:42px;line-height:1.6;
+  color:rgba(240,232,220,0.96);max-width:860px;white-space:pre-line;display:${corpo?'block':'none'}}
+
+.nota{position:absolute;bottom:88px;left:110px;right:180px;
+  font-family:'Cormorant Garamond',serif;font-weight:400;font-style:italic;font-size:18px;
+  color:rgba(212,175,110,0.65);display:${nota?'block':'none'}}
+
+.handle{position:absolute;bottom:80px;right:80px;
+  font-family:'Inter',sans-serif;font-weight:400;font-size:17px;letter-spacing:.08em;
+  color:rgba(212,175,110,0.5)}
+
+.bar{position:absolute;bottom:0;left:0;height:1px;width:${(n/total)*100}%;
+  background:linear-gradient(to right,transparent,rgba(212,175,110,0.6))}
+</style></head><body><div class="slide">
+<div class="logo">${LOGO_SVG}</div>
+<div class="num">${String(n).padStart(2,'0')} / ${String(total).padStart(2,'0')}</div>
+${tag?`<div class="tag">${tag}</div>`:''}
+<div class="headline">${headline}</div>
+${corpo?`<div class="divisor"></div><div class="corpo">${corpo}</div>`:''}
+${nota?`<div class="nota">${nota}</div>`:''}
+<div class="handle">${HANDLE}</div>
+<div class="bar"></div>
+</div></body></html>`;
+}
+
+// ── TEMPLATE IMAGEM — foto elegante, overlay vinho ───────────
+function htmlImagem(n, total, img64, tag, headline, corpo) {
+  const fs_ = headline.length > 50 ? '80px' : headline.length > 36 ? '92px' : '106px';
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1080px;height:1350px;overflow:hidden}
+.slide{position:relative;width:1080px;height:1350px;display:flex;flex-direction:column;justify-content:flex-end}
+
+.bg{position:absolute;inset:0;
+  background-image:url('${img64}');
+  background-size:cover;background-position:center;
+  filter:brightness(.68) saturate(.80)}
+
+/* overlay vinho só embaixo */
+.ov{position:absolute;inset:0;
+  background:linear-gradient(
+    to top,
+    rgba(20,5,12,0.97) 0%,
+    rgba(20,5,12,0.88) 28%,
+    rgba(20,5,12,0.45) 50%,
+    rgba(20,5,12,0.08) 70%,
+    transparent 100%
+  )}
+
+/* logo topo direito */
+.logo{position:absolute;top:52px;right:72px;width:80px;opacity:.8;z-index:10}
+
+.content{position:relative;z-index:10;padding:0 110px 96px;width:100%}
+.num{font-family:'Inter',sans-serif;font-weight:400;font-size:12px;letter-spacing:.22em;
+  color:rgba(212,175,110,.6);margin-bottom:${tag?'16px':'32px'};text-transform:uppercase}
+.tag{font-family:'Inter',sans-serif;font-weight:400;font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:#C9A84C;opacity:.8;margin-bottom:20px;display:${tag?'block':'none'}}
+.headline{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:${fs_};line-height:1.05;
+  color:#F5EDE3;letter-spacing:-.01em;margin-bottom:${corpo?'28px':'0'};max-width:840px;
+  text-shadow:0 2px 30px rgba(0,0,0,.6)}
+.divisor{width:36px;height:1px;background:rgba(212,175,110,.6);margin-bottom:24px;display:${corpo?'block':'none'}}
+.corpo{font-family:'Inter',sans-serif;font-weight:300;font-size:40px;line-height:1.6;
+  color:rgba(240,220,200,.92);max-width:860px;
+  text-shadow:0 1px 20px rgba(0,0,0,.9);
+  display:${corpo?'block':'none'};margin-bottom:40px}
+.handle{position:absolute;bottom:72px;right:80px;z-index:10;
+  font-family:'Inter',sans-serif;font-weight:400;font-size:17px;letter-spacing:.08em;
+  color:rgba(212,175,110,.5)}
+.bar{position:absolute;bottom:0;left:0;z-index:10;height:1px;
+  width:${(n/total)*100}%;background:linear-gradient(to right,transparent,rgba(212,175,110,.6))}
+</style></head><body><div class="slide">
+<div class="bg"></div><div class="ov"></div>
+<div class="logo">${LOGO_SVG}</div>
+<div class="content">
+<div class="num">${String(n).padStart(2,'0')} / ${String(total).padStart(2,'0')}</div>
+${tag?`<div class="tag">${tag}</div>`:''}
+<div class="headline">${headline}</div>
+${corpo?`<div class="divisor"></div><div class="corpo">${corpo}</div>`:''}
+</div>
+<div class="handle">${HANDLE}</div>
+<div class="bar"></div>
+</div></body></html>`;
+}
+
+async function htmlParaPng(html, pngPath, browser) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1080, height: 1350, deviceScaleFactor: 1 });
+  await page.setContent(html, { waitUntil: 'networkidle0' });
+  await new Promise(r => setTimeout(r, 2000));
+  await page.screenshot({ path: pngPath, clip: { x:0, y:0, width:1080, height:1350 } });
+  await page.close();
+}
+
+async function gerarCarrosselAyumi(slides, pastaSlug, legenda) {
+  const outputDir = path.join('C:/Users/cesar/carrossel-ayumi/output', pastaSlug);
+  const pngDir = path.join(outputDir, 'png');
+  fs.mkdirSync(pngDir, { recursive: true });
+  const total = slides.length;
+  console.log(`\n✨ Gerando ${total} slides — "${pastaSlug}"\n`);
+
+  const imgs = {};
+  for (const s of slides) {
+    if (s.layout === 'imagem' && s.imagemPrompt) {
+      console.log(`[${s.numero}] FLUX...`);
+      const url = await gerarImagem(s.imagemPrompt);
+      const p = path.join(outputDir, `img-${s.numero}.jpg`);
+      await baixarImagem(url, p);
+      imgs[s.numero] = 'data:image/jpeg;base64,' + fs.readFileSync(p).toString('base64');
+      console.log(`[${s.numero}] imagem pronta`);
+    }
+  }
+
+  const htmls = {};
+  for (const s of slides) {
+    htmls[s.numero] = s.layout === 'texto'
+      ? htmlTexto(s.numero, total, s.tag||'', s.headline, s.corpo||'', s.nota||'')
+      : htmlImagem(s.numero, total, imgs[s.numero]||'', s.tag||'', s.headline, s.corpo||'');
+    fs.writeFileSync(path.join(outputDir, `slide-${s.numero}.html`), htmls[s.numero]);
+  }
+
+  console.log('\n📸 Exportando PNGs...');
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  for (const s of slides) {
+    const pngPath = path.join(pngDir, `slide-${String(s.numero).padStart(2,'0')}.png`);
+    await htmlParaPng(htmls[s.numero], pngPath, browser);
+    console.log(`Slide ${s.numero} pronto`);
+  }
+  await browser.close();
+  if (legenda) {
+    fs.writeFileSync(path.join(outputDir, 'legenda.txt'), legenda, 'utf8');
+    console.log('\n─── LEGENDA DO POST ───────────────────────────────');
+    console.log(legenda);
+    console.log('───────────────────────────────────────────────────\n');
+  }
+  console.log(`\n✅ PNGs em: ${pngDir}`);
+  return pngDir;
+}
+
+module.exports = { gerarCarrosselAyumi, htmlTexto, htmlImagem, HANDLE, gerarImagem, baixarImagem, fetchImagemUrl };
