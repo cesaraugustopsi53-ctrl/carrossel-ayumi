@@ -114,7 +114,7 @@ const SLIDES = [
     layout: 'imagem',
     tag: 'Grupo VIP',
     headline: 'Se você quer se posicionar e ter liberdade financeira sem tráfego pago, entre no Grupo VIP.',
-    corpo: 'Link na bio.\nOu me manda uma DM: "QUERO".',
+    corpo: 'Link na bio.',
     _fotoKey: 'trabalho',
     bgPosition: '50% 55%',
     bgHeight: '880px',
@@ -133,7 +133,7 @@ Invisibilidade digital não é humildade. É escolha de continuar cobrando menos
 
 Se você quer se posicionar, ser reconhecida e ter liberdade financeira sem tráfego pago: entre no Grupo VIP da mentoria.
 
-Link na bio. Ou me manda um "QUERO" no direct.
+Link na bio.
 
 #posicionamentodigital #mulheresdeasaude #psicologadigital #nutricionistadigital #medicadigital #presencadigital #liberdadefinanceira #marketingparamulheres #empreendedorismodigital #visibilidadedigital`;
 
