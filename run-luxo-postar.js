@@ -45,7 +45,7 @@ const SLIDES = [
     numero: 1,
     layout: 'imagem',
     tag: '',
-    headline: 'Medo de postar no Instagram é luxo de quem já chegou.',
+    headline: 'Medo de postar no Instagram é luxo de quem já é rico.',
     corpo: '',
     _fotoKey: 'retrato1',
     bgPosition: '50% 36%',
@@ -116,12 +116,12 @@ const SLIDES = [
     headline: 'Se você quer se posicionar e ter liberdade financeira sem tráfego pago, entre no Grupo VIP.',
     corpo: 'Link na bio.\nOu me manda uma DM: "QUERO".',
     _fotoKey: 'trabalho',
-    bgPosition: '50% 12%',
+    bgPosition: '50% 55%',
     bgHeight: '880px',
   },
 ];
 
-const LEGENDA = `Medo de postar é luxo de quem já chegou.
+const LEGENDA = `Medo de postar é luxo de quem já é rico.
 
 Você ainda não chegou.
 
